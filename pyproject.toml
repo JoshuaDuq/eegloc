@@ -1,0 +1,47 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "eegloc"
+version = "0.1.0"
+description = "EEG electrode positions in simultaneous EEG-fMRI, from the images the session already has"
+readme = "README.md"
+requires-python = ">=3.11"
+license = { text = "MIT" }
+authors = [{ name = "Joshua Duquette" }]
+dependencies = [
+    "matplotlib>=3.8",
+    "mne>=1.8",
+    "nibabel>=5.2",
+    "numpy>=1.26",
+    "scipy>=1.11",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8.0", "ruff>=0.6", "black>=24.0"]
+
+[project.scripts]
+eegloc = "eegloc.cli:main"
+
+[project.urls]
+Repository = "https://github.com/JoshuaDuq/eegloc"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/eegloc"]
+
+[tool.ruff]
+line-length = 100
+src = ["src", "tests"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM"]
+
+[tool.black]
+line-length = 100
+target-version = ["py311"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+markers = ["slow: the end-to-end run on a synthetic head (several minutes)"]
+addopts = "-m 'not slow'"
