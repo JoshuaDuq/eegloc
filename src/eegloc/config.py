@@ -87,7 +87,7 @@ class Inputs:
 
 @dataclass(frozen=True)
 class Study:
-    """A cohort that wore the same cap: where its files are and what the cap is."""
+    """A cohort that wore caps of one layout: where its files are and what the cap is."""
 
     output: Path
     subjects: tuple[str, ...]

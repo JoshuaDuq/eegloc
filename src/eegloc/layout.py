@@ -1,8 +1,9 @@
 """The cap's real layout, learned from the participants whose fit passed its checks.
 
-A standard montage gives each site an angle from Cz and a bearing on an ideal sphere. The same
-physical cap was worn by everyone, so where a site's hole falls relative to the fitted model, in
-the cap's own coordinates, repeats across participants where the ideal layout is off. The
+A standard montage gives each site an angle from Cz and a bearing on an ideal sphere. Everyone
+wore a cap of the same model, in the size of their head, so where a site's hole falls relative to
+the fitted model, in the cap's own coordinates and as a fraction of the participant's fitted
+stretch, repeats across participants where the ideal layout is off. The
 correction of a site is the median of that offset over participants, made left-right symmetric
 (the cap is), and applied where enough participants contribute.
 """
