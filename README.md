@@ -97,9 +97,9 @@ positions of the sites that face the viewer.
 
 The procedure has two passes. The first pass (`eegloc fit`) treats each participant independently
 and uses the layout of the standard montage. The second pass (`eegloc refine`) estimates the
-layout of the physical cap from the participants whose first-pass fit met the criteria: for each
+layout of the cap as worn from the participants whose first-pass fit met the criteria: for each
 site, the median offset between the fitted site and its hole, expressed in the cap's coordinates
-and made left-right symmetric, is added to the montage's layout where at least five participants
+relative to the participant's fitted stretch and made left-right symmetric, is added to the montage's layout where at least five participants
 contribute. Each participant is then refitted with the layout estimated from the other
 participants, within narrower bounds and from two random seeds.
 
@@ -107,9 +107,10 @@ participants, within narrower bounds and from two random seeds.
 
 ### Cohort
 
-The procedure was applied to 20 participants recorded with the same cap of 65 sites (63 channels,
-reference FCz, ground AFz; layout `easycap-M1`), with T1-weighted images of 1 mm resolution and
-six EPI runs of 3 mm resolution each. The starting positions were template positions: those of
+The procedure was applied to 20 participants, each recorded with a cap of the same model in the
+size of their head: 65 sites (63 channels, reference FCz, ground AFz; layout `easycap-M1`). The
+T1-weighted images had a resolution of 1 mm, and there were six EPI runs of 3 mm resolution per
+participant. The starting positions were template positions: those of
 the standard montage fitted to each participant's scalp surface (the procedure of
 `examples/starting_positions.py`).
 
@@ -180,6 +181,131 @@ within the bounds that both fits search lay a median 16.0 mm from it (13.8 to 18
 fits share the starting positions, the bounds and the cap layout, which was learned from fits to
 the EPI holes of the other participants; they do not share the image in which the electrodes are
 detected.
+
+### Repeatability across runs
+
+The test-retest check compares two halves of the runs, and compares the sites as the cap model
+places them. The second-pass fit was therefore repeated on the holes of each of the six runs
+alone (`docs/run_retest.py`), and the positions as reported (a hole's position where the site has
+one) were compared as well. The runs share the T1-weighted image, the starting positions, the
+bounds and the cap layout, which was learned from the other participants; each run has its own
+EPI reference image and its own transform to the T1.
+
+| Median (range) over the 19 participants whose fit met all criteria | |
+|---|---|
+| Distance between two runs, sites as placed by the cap model | 0.78 mm (0.34 to 2.38) |
+| Distance between two runs, reported positions | 0.96 mm (0.41 to 2.44) |
+| Distance between one run and all six runs, reported positions | 0.58 mm (0.31 to 1.66) |
+| Holes of two runs that are the same hole | 0.92 (0.86 to 0.96) |
+| Distance between the two detections of the same hole | 0.96 mm (0.47 to 1.68) |
+| Distance of random poses from the fit to all runs | 16.0 mm (13.7 to 18.6) |
+
+A distance between two runs is the median over sites, then over the 15 pairs of runs of a
+participant. Two holes are the same hole when each is the other's nearest within 8 mm, whatever
+the cap. Random poses are drawn within the bounds of the search.
+
+Over all sites, pairs of runs and participants, 88% of the reported positions lay within 3 mm of
+those of the other run and 94% within 5 mm (Fig. 5b). A site that had a hole in every run (58% of
+the sites) had a standard deviation across runs of a median 0.8 mm, and a site that had a hole in
+none (25%) of 0.7 mm; a site that had a hole in some runs only (17%), and so alternated between
+the position of a hole and that of the cap model, of 3.1 mm. The intraclass correlation of single
+runs, ICC(1,1), was 0.980 for the pitch, 0.982 for the roll and 0.996 for the twist of the cap
+(Fig. 5c-e), 0.974 and 0.967 for its two stretches, and a median 0.97 across channels (range 0.91
+to 0.99) for the displacement of a channel's reported position from its starting position.
+
+The reported positions of consecutive runs differed by a median 0.8 mm and those of runs
+separated by at least two others by 1.3 mm, more than consecutive runs in all 19 participants. A
+slow displacement of the cap on the head, or a drift of the EPI, would produce this; an error of
+measurement alone would not. In the participant whose fit did not meet the criteria, the reported
+positions of two runs differed by a median 19.2 mm, as much as random poses (Fig. 5a).
+
+The cap is not taken off between the runs. These distances measure how well the positions repeat,
+not how close they are to the electrodes: an error common to the runs (of the scalp floor, of the
+cap model, or of the EPI where its distortion is not fully corrected) leaves them unchanged.
+
+![Repeatability of the positions across single runs](docs/figures/runs.png)
+
+**Figure 5 | Repeatability of the positions across single runs.** The second-pass fit repeated on
+the holes of each of the six runs alone. **a**, Median over sites of the distance between the
+reported positions of two runs: the 15 pairs of runs of each participant (grey) and their median
+(blue; open marker, fit that did not meet the criteria). Participants are ordered as in Fig. 3.
+Dashed line, median distance of poses drawn at random within the bounds of the search from the
+fit to all runs. **b**, Cumulative distribution of the distance between two runs over sites,
+pairs of runs and the 19 participants whose fit met all criteria (n = 18,525), for the sites as
+placed by the cap model (grey) and as reported (blue); distances below 0.1 mm are at the left
+edge. **c**-**e**, Pitch, roll and twist of the cap fitted to one run against their mean over
+the participant's five other runs (19 participants, six runs each). Line, identity; the axes span
+the bounds of the search. **f**, Standard deviation across runs of each site's reported position,
+the three axes combined (root mean square over the 19 participants), on the layout of the standard
+montage (nose at the top; scale bar on the unstretched cap).
+
+### A cohort with a weaker EPI and electrodes marked by hand
+
+Scrivener et al. (2021) shared a simultaneous EEG-fMRI experiment recorded with a cap of the same
+layout as the cohort's, and Scrivener and Reader (2022) marked each of its 65 electrodes by hand
+on the gel artifacts of the structural images, in the scanner coordinates of the image.
+`docs/scrivener_data.py` prepares these data as a study: the defaced T1-weighted image, one
+reference image for each of the five blocks of the EPI with its rigid registration to the T1, and
+starting positions from a template head. Sixteen participants have images, 15 of them marked
+positions. Both passes were run with the settings unchanged.
+
+The EPI of this experiment shows less of the scalp and of the electrodes than the cohort's
+(`docs/epi_quality.py`; Fig. 6a-d). Its echo time is 30 ms against 20 ms, its voxels are
+3 x 3 x 3.6 mm against 3 mm, its 30 slices leave out the vertex, and its distortion was not
+corrected here.
+
+| Median (range) over participants | Cohort (n = 20) | Scrivener et al. (n = 16) |
+|---|---|---|
+| Scalp signal relative to cortex | 0.21 (0.17 to 0.32) | 0.15 (0.10 to 0.26) |
+| Depth of the holes | 0.37 (0.29 to 0.45) | 0.27 (0.24 to 0.34) |
+| Holes | 80.5 (75 to 94) | 60 (38 to 83) |
+| Fitted sites within the EPI's coverage | 0.98 (0.89 to 1.00) | 0.88 (0.69 to 0.94) |
+| z of the second-pass fit against twisted caps | 9.4 (2.0 to 15.0) | 1.0 (-1.1 to 2.8) |
+
+The scalp signal is the median of the scalp layer within the EPI's coverage, relative to the same
+shell 15 to 25 mm below the scalp floor; the depth of a hole is the signal it loses relative to
+the local mean.
+
+No fit met the criteria in either pass (Fig. 6e), and no first-pass fit could teach the layout:
+the second pass differed from the first by its bounds and seeds only. With no cap at all, 38% of
+the marked electrodes within the EPI's coverage had a hole within 5 mm (range over participants,
+24 to 60%), against 9% (6 to 14%) for the same electrodes turned about the vertical axis. This
+fraction increased with the depth of the participant's holes (Spearman's rho = 0.66, n = 15).
+
+The positions reported by the second pass lay a median 6.6 mm along the scalp from the marked
+positions (range of the participants' medians, 5.2 to 24.9 mm), and the starting positions
+10.4 mm (7.9 to 21.0 mm); positions were compared once moved along their ray from the centre of
+the head onto the scalp floor. The distance decreased as the z of the fit increased (rho = -0.53;
+first pass, -0.65; Fig. 6f). When the second pass was given the layout learned on the cohort in
+place of the montage's, three fits reached z > 3, at 4.9 to 5.5 mm from the marked positions, and
+one of them met all criteria (4.9 mm).
+
+The cap model was also fitted to the marked positions themselves (`docs/manual_comparison.py`).
+Its five parameters left the 65 sites a median 5.1 mm from them with the montage's layout (range
+over participants, 4.1 to 7.3 mm) and 4.7 mm with the layout learned on the cohort (3.9 to
+7.8 mm). With the montage's layout the sites left farthest were those nearest the ears (median
+over participants: TP10, 18.1 mm; FT9, 12.9 mm; TP8, 11.9 mm; TP9, 11.1 mm). A site that keeps
+the position of the cap model cannot be expected nearer its electrode than this.
+
+In this experiment the checks rejected every fit, and the rejected fits were 5 to 25 mm from the
+electrodes. The experiment does not give the accuracy of a fit that meets the criteria, nor that
+of a site assigned the position of a hole in an EPI such as the cohort's.
+
+![An EPI that shows little of the electrodes](docs/figures/quality.png)
+
+**Figure 6 | An EPI that shows little of the electrodes.** **a**, Signal loss of the EPI scalp
+layer in the participant of the cohort whose holes have the median depth, with the positions of
+the second pass (circles). **b**, The same in the participant of Scrivener et al. whose holes
+have the median depth, with the electrodes marked by hand on the T1, moved onto the scalp floor
+(circles). Grey scale and projection of Fig. 1e; the EPI of **b** does not cover the vertex.
+**c**-**e**, Signal of the scalp layer relative to the cortex (**c**), median depth of the holes
+(**d**) and z of the second-pass fit against twisted caps (**e**; dashed line, criterion) in each
+participant of the cohort (blue, n = 20) and of Scrivener et al. (orange, n = 16); bars, medians.
+**f**, Median distance along the scalp between the reported and the marked positions against the
+z of the fit, in the 15 participants with marked positions: second pass (orange), second pass
+with the layout learned on the cohort (blue; filled marker, all criteria met), and starting
+positions (diamonds, at the z of the second pass). Grey line, median distance left by the cap
+model fitted to the marked positions; dashed line, criterion.
 
 ### Synthetic head
 
@@ -306,9 +432,17 @@ A fit is recorded as `passed` when all five criteria are met.
 - The scalp surface is taken from a T1-weighted image acquired with the cap on.
 - Sites outside the EPI's coverage of the scalp, or without a distinct hole, receive the position
   given by the cap model.
-- The second pass assumes that all participants wore the same cap.
-- The positions have not been compared with digitized positions. On real data, their support is
-  the five checks and the agreement of the fits to the two images.
+- The second pass assumes that all participants wore caps of the same layout. Their size may
+  differ: each participant's stretch is fitted, and the layout is learned relative to it.
+- No fit that meets the criteria has been compared with measured positions: in the one
+  experiment with electrodes marked by hand, no fit met them. On the cohort of the evaluation, the
+  support of the positions is the five checks, the agreement of the fits to the two images and
+  their repeatability across runs, which measures precision and not accuracy.
+- The EPI must show the scalp and the electrodes. Where it showed less of them (an echo time of
+  30 ms, thicker slices, the vertex out of the field of view), no fit met the criteria;
+  `docs/epi_quality.py` reports the scalp signal and the depth of the holes of a study.
+- The cap model, fitted to electrodes marked by hand, was a median 5 mm from them, and 11 to
+  18 mm at TP9, TP10, FT9 and TP8. A site without a hole of its own cannot be expected nearer.
 - The settings (`src/eegloc/config.py`) were chosen on the cohort described above, which is also
   the cohort of the evaluation: no participant was held out.
 
@@ -327,10 +461,15 @@ pytest -m slow
 ```
 
 The slow test runs both passes from the command line on the synthetic participant.
-`docs/t1_comparison.py` compares the electrodes seen in the two images. `docs/make_figures.py`
-draws the figures of this page and of
+`docs/t1_comparison.py` compares the electrodes seen in the two images and `docs/run_retest.py`
+repeats the fit on each run alone. `docs/make_figures.py` draws the figures of this page and of
 [the supplementary page](docs/supplementary.md) from the outputs of a study, for one of its
-participants, and of the synthetic participant.
+participants, of `docs/run_retest.py` and of the synthetic participant.
+
+`docs/scrivener_data.py` fetches and prepares the experiment of Scrivener et al. as a study (it
+needs `antspyx`); once both passes have been run on it, `docs/epi_quality.py` measures what the
+EPI of a study shows, and `docs/manual_comparison.py` compares the fits with the marked positions
+and draws Fig. 6.
 
 ## References
 
@@ -350,6 +489,14 @@ simultaneous EEG/fMRI. *Front. ICT* **5**, 31 (2019).
 
 Pinte, C., Fleury, M. & Maurel, P. Deep learning-based localization of EEG electrodes within MRI
 acquisitions. *Front. Neurol.* **12**, 644278 (2021).
+
+Scrivener, C. L., Malik, A., Lindner, M. & Roesch, E. B. Sensing and seeing associated with
+overlapping occipitoparietal activation in simultaneous EEG-fMRI. *Neurosci. Conscious.* **2021**,
+niab008 (2021).
+
+Scrivener, C. L. & Reader, A. T. Variability of EEG electrode positions and their underlying
+brain regions: visualizing gel artifacts from a simultaneous EEG-fMRI dataset. *Brain Behav.*
+**12**, e2476 (2022).
 
 ## License
 

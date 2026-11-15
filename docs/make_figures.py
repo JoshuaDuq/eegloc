@@ -4,8 +4,9 @@
 
 STUDY is the study file and SUBJECT the participant shown in the figures of one participant; the
 other figures show every participant of the study. SYNTHETIC is the folder written by
-examples/synthetic_participant.py, once both passes have been run on its study file. The numbers
-quoted in the README and its captions are printed.
+examples/synthetic_participant.py, once both passes have been run on its study file. The figure
+of the runs is drawn from the output of docs/run_retest.py on the study. The numbers quoted in the
+README and its captions are printed.
 """
 
 import csv
@@ -20,6 +21,7 @@ import matplotlib.pyplot as plt  # noqa: E402
 import nibabel as nib  # noqa: E402
 import numpy as np  # noqa: E402
 from matplotlib.colors import Normalize  # noqa: E402
+from run_retest import between_runs, icc  # noqa: E402
 from scipy import ndimage  # noqa: E402
 from scipy.spatial import Delaunay, cKDTree  # noqa: E402
 
@@ -39,6 +41,7 @@ from eegloc.config import (  # noqa: E402
     PASS_RETEST_MM,
     PASS_T1_P,
     PASS_Z,
+    SECOND_BOUNDS,
     T1_SMOOTHING_MM,
     Study,
 )
@@ -112,7 +115,7 @@ def title(ax, index, text, shift=-10):
 
 
 def read_records(folder):
-    return {p.stem: json.loads(p.read_text()) for p in sorted(folder.glob("*.json"))}
+    return {p.stem: json.loads(p.read_text()) for p in sorted(folder.glob("[!.]*.json"))}
 
 
 def read_electrodes(path):
@@ -780,6 +783,118 @@ def figure_passes(study, first, second):
     plt.close(fig)
 
 
+def figure_runs(study, records):
+    """The second-pass fit repeated on each run alone (docs/run_retest.py), in every participant."""
+    with np.load(study.output / "run_retest.npz") as file:
+        runs = {key: file[key] for key in file.files}
+    with open(study.output / "run_retest.tsv", newline="") as file:
+        random = [
+            float(row["random_pose_to_all_runs_median_mm"])
+            for row in csv.DictReader(file, delimiter="\t")
+        ]
+    order = sorted(records, key=lambda subject: -records[subject]["z"])
+    passing = [subject for subject in order if records[subject]["passed"]]
+
+    fig = plt.figure(figsize=(WIDTH, 112 * MM))
+    upper = fig.add_gridspec(1, 2, width_ratios=[1.7, 1], wspace=0.22)
+    upper.update(left=0.075, right=0.985, top=0.93, bottom=0.6)
+    lower = fig.add_gridspec(1, 4, width_ratios=[1, 1, 1, 1.2], wspace=0.5)
+    lower.update(left=0.075, right=0.985, top=0.42, bottom=0.09)
+    a, b = (fig.add_subplot(upper[0, k]) for k in range(2))
+    c, d, e, f = (fig.add_subplot(lower[0, k]) for k in range(4))
+
+    x = np.arange(1, len(order) + 1)
+    apart = np.array([np.median(between_runs(runs[f"{s}_reported"]), axis=1) for s in order])
+    a.scatter(np.repeat(x, apart.shape[1]), apart.ravel(), s=3, c=GREY, linewidths=0)
+    mark(a, x, np.median(apart, axis=1), np.array([records[s]["passed"] for s in order]))
+    a.axhline(np.median(random), color="black", linewidth=0.4, linestyle=(0, (4, 3)))
+    a.annotate(
+        "Random poses",
+        (0.01, np.median(random)),
+        xycoords=("axes fraction", "data"),
+        xytext=(0, 1.5),
+        textcoords="offset points",
+        va="bottom",
+        fontsize=6,
+    )
+    a.set_yscale("log")
+    a.set_ylim(0.2, 60)
+    a.set_yticks([0.3, 1, 3, 10, 30], labels=["0.3", "1", "3", "10", "30"])
+    a.set_xticks(x[::2] if len(x) > 12 else x)
+    a.set_xlim(0.3, len(x) + 0.7)
+    a.set_xlabel("Participant (ordered by z of the twisted-cap null)")
+    a.set_ylabel("Distance between runs (mm)")
+    title(a, 0, "Pairs of single runs")
+
+    for key, colour, label in (("model", GREY, "Cap model"), ("reported", BLUE, "Reported")):
+        pooled = np.sort(
+            np.concatenate([between_runs(runs[f"{s}_{key}"]).ravel() for s in passing])
+        )
+        b.plot(
+            pooled,
+            np.arange(1, len(pooled) + 1) / len(pooled),
+            color=colour,
+            linewidth=1.0,
+            label=label,
+        )
+    b.set_xscale("log")
+    b.set_xlim(0.1, 30)
+    b.set_xticks([0.1, 0.3, 1, 3, 10, 30], labels=["0.1", "0.3", "1", "3", "10", "30"])
+    b.set_ylim(0, 1)
+    b.set_xlabel("Distance between runs (mm)")
+    b.set_ylabel("Fraction of sites")
+    b.legend(loc="lower right", handlelength=1.4, borderaxespad=0.0)
+    title(b, 1, "All sites and pairs of runs")
+
+    poses = np.array([runs[f"{s}_poses"] for s in passing])
+    others = (poses.sum(axis=1, keepdims=True) - poses) / (poses.shape[1] - 1)
+    for index, (ax, name) in enumerate(zip((c, d, e), ("Pitch", "Roll", "Twist"), strict=True)):
+        low, high = SECOND_BOUNDS[index]
+        ax.plot([low, high], [low, high], color=GREY, linewidth=0.4)
+        ax.scatter(others[..., index], poses[..., index], s=4, c=BLUE, linewidths=0, alpha=0.7)
+        ax.set_xlim(low, high)
+        ax.set_ylim(low, high)
+        ax.set_aspect("equal")
+        ax.set_anchor("NW")
+        ticks = np.linspace(low, high, 5)
+        ax.set_xticks(ticks)
+        ax.set_yticks(ticks)
+        ax.set_xlabel("Other runs (deg)")
+        ax.annotate(
+            f"ICC {icc(poses[..., index])[0]:.3f}",
+            (0.05, 0.95),
+            xycoords="axes fraction",
+            ha="left",
+            va="top",
+            fontsize=6,
+        )
+        title(ax, 2 + index, name)
+    c.set_ylabel("One run (deg)")
+
+    base = pipeline.lessons(study).layout
+    reported = np.array([runs[f"{s}_reported"] for s in passing])
+    spread = np.sqrt(reported.var(axis=1, ddof=1).sum(axis=2).mean(axis=0))
+    shown = f.scatter(
+        NOMINAL_RADIUS_MM * base.angle * np.cos(base.bearing),
+        NOMINAL_RADIUS_MM * base.angle * np.sin(base.bearing),
+        s=22,
+        c=spread,
+        cmap="viridis_r",
+        vmin=0,
+        vmax=3,
+        linewidths=0,
+    )
+    frame_layout(f)
+    inset = f.inset_axes([0.42, 0.0, 0.5, 0.03])
+    bar = fig.colorbar(shown, cax=inset, orientation="horizontal", ticks=[0, 1, 2, 3])
+    bar.outline.set_linewidth(0.4)
+    bar.ax.tick_params(length=1.5, width=0.4, pad=1.5)
+    bar.set_label("s.d. across runs (mm)", labelpad=2)
+    title(f, 5, "Spread of each site")
+    fig.savefig(FOLDER / "runs.png")
+    plt.close(fig)
+
+
 def figure_synthetic(folder):
     """Fitted against true positions on the synthetic participant of the examples."""
     study, subject = Study.read(folder / "study.toml"), "sub-01"
@@ -936,5 +1051,6 @@ if __name__ == "__main__":
     figure_checks(second)
     figure_template(study, second)
     figure_passes(study, first, second)
+    figure_runs(study, second)
     figure_synthetic(synthetic)
     print_numbers(study, subject, first, second)
