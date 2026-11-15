@@ -84,7 +84,7 @@ def _pixels(points: Array) -> tuple[Array, Array]:
 
 def summarize(folder: Path) -> str:
     """Write the pass's summary.tsv, one row per participant, and describe the cohort's checks."""
-    records = [json.loads(path.read_text()) for path in sorted(folder.glob("*.json"))]
+    records = [json.loads(path.read_text()) for path in sorted(folder.glob("[!.]*.json"))]
     rows = [
         dict(
             subject=record["subject"],
